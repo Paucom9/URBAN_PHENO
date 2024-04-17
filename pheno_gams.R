@@ -183,10 +183,13 @@ phenology_estimates <- data.frame(ID = numeric(),
                                   YEAR = numeric(), 
                                   SPECIES = character(), 
                                   SITE_ID = character(), 
-                                  Start_Day = numeric(), 
-                                  End_Day = numeric(), 
-                                  Peak_Day = numeric(), 
-                                  Flight_Length = numeric(), 
+                                  ONSET_mean = numeric(),
+                                  ONSET_var = numeric(), 
+                                  OFFSET_mean = numeric(), 
+                                  OFFSET_var = numeric(), 
+                                  PEAKDAY = numeric(), 
+                                  FLIGHT_LENGTH_mean = numeric(),
+                                  FLIGHT_LENGTH_var = numeric(), 
                                   stringsAsFactors = FALSE)
 
 
@@ -244,12 +247,26 @@ for(id in unique(m_count_univol$ID)){
       
       pheno <- data.frame(Julian_Day = julian_days, Predicted_Count = predict_count)
       
-      # Phenology estimates
+      # --- Phenology estimates --- #
       
       peak_day <- which.max(pheno$Predicted_Count) # Day of the flight curve in which the abundance is maximum
-      flight_length <- pheno %>% filter(Predicted_Count >= 1) %>% nrow() # Length of the flight period
-      start_day <- pheno %>%filter(Predicted_Count >= 1) %>% summarize(start = min(Julian_Day)) %>% pull(start) # First day of appearance
-      end_day <- pheno %>% filter(Predicted_Count >= 1) %>% summarize(end = max(Julian_Day)) %>% pull(end) # Last day of appearance
+      
+      # Identify onset and offset of butterfly activity using change point analysis
+      cp_mean <- cpt.mean(pheno$Predicted_Count, method = "PELT", penalty = "Manual", pen.value = 0.05)
+      cp_var <- cpt.var(pheno$Predicted_Count, method = "PELT", penalty = "Manual", pen.value = 0.05)
+      
+      # Extract the change points
+      change_points_mean <- cpts(cp_mean)
+      change_points_var <- cpts(cp_var)
+      
+      # Extract the first and last change points
+      onset_mean <- min(change_points_mean) # First day of appearance with cp_mean method
+      offset_mean <- max(change_points_mean) # Last day of appearance with cp_var method
+      onset_var <- min(change_points_var) # First day of appearance with cp_mean method
+      offset_var <- max(change_points_var) # Last day of appearance with cp_var method
+      
+      flight_length_mean <- length(onset_mean:offset_mean)   # Length of the flight period
+      flight_length_var <- length(onset_var:offset_var)   # Length of the flight period
       
       # Save the results into the data frame
       phenology_estimates <- rbind(phenology_estimates, 
@@ -257,10 +274,13 @@ for(id in unique(m_count_univol$ID)){
                                               YEAR = YEAR, 
                                               SPECIES = unique(sub_count_year$SPECIES), 
                                               SITE_ID = unique(sub_count_year$SITE_ID), 
-                                              Start_Day = start_day, 
-                                              End_Day = end_day, 
-                                              Peak_Day = peak_day, 
-                                              Flight_Length = flight_length))
+                                              ONSET_mean = onset_mean,
+                                              ONSET_var = onset_var, 
+                                              OFFSET_mean = offset_mean, 
+                                              OFFSET_var = offset_var, 
+                                              PEAKDAY = peak_day, 
+                                              FLIGHT_LENGTH_mean = flight_length_mean,
+                                              FLIGHT_LENGTH_var = flight_length_var))
       
       cat(sprintf("Phenology estimates calculated for %s in year %s\n", id, YEAR))
       

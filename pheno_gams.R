@@ -5,18 +5,14 @@ setwd("D:/URBAN TRENDS/BMS data/BMS DATA 2024")
 # Load required libraries
 # ----
 library(data.table)  # For efficient data handling
-library(rbms)        # For butterfly monitoring data analysis
 library(mgcv)        # For generalized additive models
 library(dplyr)       # For data manipulation
 library(tidyr)       # For data tidying
-library(foreach)     # For looping constructs
 library(broom)       # For converting statistical analysis objects into tidy data frames
 library(stringr)     # For string manipulation
 library(lubridate)   # For easy and intuitive work with dates and times
-library(suncalc)     # For calculating photoperiod
-library(sf)          # For managing spatial data
 library(doParallel)  # For increasing loop performance
-library(mgcv)
+library(changepoint) # For change point analyses
 # ----
 
 
@@ -141,6 +137,7 @@ head(m_visit)
 
 # --- Filter data by univoltine species --- #
 #----
+
 setwd("D:/URBAN TRENDS/Traits data")  
 traits <- read.csv("Traits_table.csv", sep = ";", dec = ".")
 
@@ -155,6 +152,8 @@ uni_sp <- traits %>%
 m_count_univol <- m_count %>%
   filter(SPECIES %in% uni_sp)
 #----
+
+# --- Calculate pheno estimates for univoltines butterflies --- #
 
 # Create an anchor argument to add zeros (0) before and after the monitoring season 
 # This ensures that the flight curve starts and end at zero
@@ -233,8 +232,21 @@ for(id in unique(m_count_univol$ID)){
       
       all_counts <- rbind(all_counts, anchor)
       
+      tryCatch({
+      
       # Fit a GAM model
       gam_model <- gam(COUNT ~ s(julian_day), data = all_counts, family = nb)
+      
+      if (inherits(gam_model, "try-error")) {
+      peak_day <- NA
+      onset_var <- NA
+      onset_mean <- NA
+      offset_var <- NA
+      offset_mean <- NA
+      flight_length_var <- NA
+      flight_length_mean <- NA
+      
+      } else {
       
       # Create a sequence of Julian days from 1 to 365
       julian_days <- 1:365
@@ -259,14 +271,34 @@ for(id in unique(m_count_univol$ID)){
       change_points_mean <- cpts(cp_mean)
       change_points_var <- cpts(cp_var)
       
-      # Extract the first and last change points
-      onset_mean <- min(change_points_mean) # First day of appearance with cp_mean method
-      offset_mean <- max(change_points_mean) # Last day of appearance with cp_var method
-      onset_var <- min(change_points_var) # First day of appearance with cp_mean method
-      offset_var <- max(change_points_var) # Last day of appearance with cp_var method
+      if (inherits(change_points_mean, "try-error")) {
+        onset_mean <- NA
+        offset_mean <- NA
+        flight_length_mean <- NA
+      } else {
+        onset_mean <- min(change_points_mean) # First day of appearance with cp_mean method
+        offset_mean <- max(change_points_mean) # Last day of appearance with cp_var method
+        flight_length_mean <- length(onset_mean:offset_mean)   # Length of the flight period
+      }
       
-      flight_length_mean <- length(onset_mean:offset_mean)   # Length of the flight period
-      flight_length_var <- length(onset_var:offset_var)   # Length of the flight period
+      if (inherits(change_points_var, "try-error")) {
+        onset_var <- NA
+        offset_var <- NA
+        flight_length_var <- NA
+      } else {
+        onset_var <- min(change_points_var) # First day of appearance with cp_mean method
+        offset_var <- max(change_points_var) # Last day of appearance with cp_var method
+        flight_length_var <- length(onset_var:offset_var)   # Length of the flight period
+      }
+      
+      
+      }
+      
+      }, error = function(e) {
+
+        print(paste("Error for ", id, " in ", YEAR, ":", e))
+        
+      })
       
       # Save the results into the data frame
       phenology_estimates <- rbind(phenology_estimates, 
@@ -282,12 +314,12 @@ for(id in unique(m_count_univol$ID)){
                                               FLIGHT_LENGTH_mean = flight_length_mean,
                                               FLIGHT_LENGTH_var = flight_length_var))
       
-      cat(sprintf("Phenology estimates calculated for %s in year %s\n", id, YEAR))
+      #cat(sprintf("Phenology estimates calculated for %s in year %s\n", id, YEAR))
       
       
     } else {
       
-      cat(sprintf("Not enough data to calculate phenology estimates for %s in year %s\n", id, YEAR))
+      #cat(sprintf("Not enough data to calculate phenology estimates for %s in year %s\n", id, YEAR))
       
     }
 
@@ -298,9 +330,13 @@ for(id in unique(m_count_univol$ID)){
 
 #----
 
+head(phenology_estimates)
 
+# Specify the file path and name
+file_path <- "D:/URBAN TRENDS/Urban_pheno/pheno_estimates.csv"
 
-
+# Save as a CSV file
+write.csv(phenology_estimates, file = file_path, row.names = FALSE)
 
 
 

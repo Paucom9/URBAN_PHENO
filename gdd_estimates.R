@@ -195,6 +195,34 @@ for(country in unique(m_coord_c$country_code)){
 
 
 
+# --- Data compilation --- #
+
+setwd("D:/URBAN TRENDS/Climate data/Copernicus climate data")
+
+
+# Get a list of R files in the working directory starting with "gdd5_"
+file_list <- list.files(pattern = "^gdd5_", full.names = TRUE)
+
+# Read each CSV file and bind them row-wise
+combined_data <- do.call(rbind, lapply(file_list, function(file) {
+  read.csv(file, header = TRUE)  # Use read.csv for CSV files
+}))
+
+
+head(combined_data)
+
+
+# Create new column names for GDD5
+new_col_names <- paste0("GDD5_", 1:12)
+
+# Pivot the data wider to create separate columns for each Month's GDD5 value
+combined_data <- combined_data %>%
+  pivot_wider(names_from = Month, values_from = GDD5, names_prefix = "GDD5_") %>%
+  mutate(across(starts_with("GDD5"), as.numeric))  # Convert GDD5 columns to numeric if needed
+
+# Save the new dataframe as a CSV file in the working directory
+write.csv(combined_data, "gdd5_compiled.csv", row.names = FALSE)
+
 
 
 

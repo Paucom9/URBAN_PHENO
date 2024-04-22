@@ -115,18 +115,18 @@ for(country in unique(m_coord_c$country_code)){
     
     ## minimum
     climate_data = extract_nc_value(first_year = First_year_chunk, last_year = Last_year_chunk,local_file = FALSE, file_path = NULL,sml_chunk = Period_chunk, spatial_extent = bms_bbsf,
-                                    clim_variable = "min temp",statistic = "mean", grid_size = 0.1, ecad_v = NULL, write_raster = TRUE, out = "raster_min_temp1.tiff",
+                                    clim_variable = "min temp",statistic = "mean", grid_size = 0.25, ecad_v = NULL, write_raster = TRUE, out = "raster_min_temp1.tiff",
                                     return_data = TRUE)
     
     ## maximum
     climate_data = extract_nc_value(first_year = First_year_chunk, last_year = Last_year_chunk,local_file = FALSE,file_path = NULL,sml_chunk = Period_chunk,spatial_extent = bms_bbsf,
-                                    clim_variable = "max temp",statistic = "mean", grid_size = 0.1, ecad_v = NULL,write_raster = TRUE,out = "raster_max_temp1.tiff",
+                                    clim_variable = "max temp",statistic = "mean", grid_size = 0.25, ecad_v = NULL,write_raster = TRUE,out = "raster_max_temp1.tiff",
                                     return_data = TRUE)
     
     rbk_min = terra::rast("raster_min_temp1.tiff")
     rbk_max = terra::rast("raster_max_temp1.tiff")
     
-    be_gdd<- gdd_extract(base_temp = 10, min_temp = rbk_min, max_temp = rbk_max, gdd_method = 'be')
+    be_gdd<- gdd_extract(base_temp = 5, min_temp = rbk_min, max_temp = rbk_max, gdd_method = 'be')
     
     tp_index <- get_layer_indice(x = be_gdd,
                                  date_format = "%Y-%m-%d",
@@ -153,22 +153,22 @@ for(country in unique(m_coord_c$country_code)){
       sub_country_coord <- subset(country_coord, country_coord$transect_id == site)
       
       point <- unname(unlist(country_coord[1, 8:9]))
+      site_location <- vect(cbind(point[1], point[2]), crs="EPSG:4326")
       
-      values <- terra::extract(last_day_gdd, point) # Extract values at the specified point
-      values <- values[2,] 
+      values <- terra::extract(last_day_gdd, site_location) # Extract values at the specified point
       
       # Pivot the data frame to a long format
       values_long <- values %>%
         pivot_longer(
-          cols = everything(), 
+          cols = -ID, # Exclude the ID column
           names_to = "Date", 
-          values_to = "GDD10"
-        )%>%
+          values_to = "GDD5"
+        ) %>%
         # Extract year and month from the Date
         # Assuming the date format is YYYY-MM-DD
         separate(Date, into = c("Year", "Month", "Day"), sep = "-") %>%
-        # Select only the columns we want (exclude Day)
-        dplyr::select(-Day) %>%
+        # Select only the columns we want (exclude Day and ID)
+        dplyr::select(-Day, -ID) %>%
         # Arrange the data if necessary
         arrange(Year, Month)
       
@@ -182,7 +182,7 @@ for(country in unique(m_coord_c$country_code)){
     }
     
     # Create the filename string with the unique country code
-    filename <- paste0(permanent_dir, "/", "gdd10_", country, "_", Period_chunk, ".csv")  # Added "/" separator
+    filename <- paste0(permanent_dir, "/", "gdd5_", country, "_", Period_chunk, ".csv")  # Added "/" separator
     
     # Use write_csv from the readr package to write the file
     write.csv(gdd_df, filename, row.names = FALSE)

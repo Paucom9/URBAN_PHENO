@@ -72,6 +72,10 @@ Period <- c("2011-2023", "1995-2010", "1980-1994", "1965-1979")
 First_year<- c(2011, 1995, 1980, 1976)
 Last_year <- c(2023, 2010, 1994, 1979)
 
+subset_m_coord_c <- m_coord_c[m_coord_c$Country.Name %in% c("Spain", "Belgium"), ]
+head(subset_m_coord_c)
+
+
 
 for(country in unique(m_coord_c$country_code)){
   
@@ -94,7 +98,7 @@ for(country in unique(m_coord_c$country_code)){
   grid_points<- grid_points[sf_point]
   bms_bb<- st_bbox(st_transform(grid_points, 4326))
   bms_bbsf<- st_make_grid(bms_bb, n = 1, what = "polygons")
-  bms_grid<- st_make_grid(bms_bb, cellsize = 25000 , square = TRUE,  what = "polygons")
+  bms_grid<- st_make_grid(bms_bb, cellsize = 10000 , square = TRUE,  what = "polygons") # replace cellsize
   bms_bbsf<-st_as_sf(bms_bbsf)
   
   
@@ -182,7 +186,7 @@ for(country in unique(m_coord_c$country_code)){
     }
     
     # Create the filename string with the unique country code
-    filename <- paste0(permanent_dir, "/", "gdd5_", country, "_", Period_chunk, ".csv")  # Added "/" separator
+    filename <- paste0(permanent_dir, "/", "gdd5_025_", country, "_", Period_chunk, ".csv")  # Added "/" separator
     
     # Use write_csv from the readr package to write the file
     write.csv(gdd_df, filename, row.names = FALSE)
@@ -197,11 +201,11 @@ for(country in unique(m_coord_c$country_code)){
 
 # --- Data compilation --- #
 
-setwd("D:/URBAN TRENDS/Climate data/Copernicus climate data")
+setwd("E:/URBAN TRENDS/Climate data/Copernicus climate data")
 
 
 # Get a list of R files in the working directory starting with "gdd5_"
-file_list <- list.files(pattern = "^gdd5_", full.names = TRUE)
+file_list <- list.files(pattern = "^gdd5_025_", full.names = TRUE)
 
 # Read each CSV file and bind them row-wise
 combined_data <- do.call(rbind, lapply(file_list, function(file) {
@@ -210,6 +214,7 @@ combined_data <- do.call(rbind, lapply(file_list, function(file) {
 
 
 head(combined_data)
+
 
 
 # Create new column names for GDD5
@@ -221,10 +226,20 @@ combined_data <- combined_data %>%
   mutate(across(starts_with("GDD5"), as.numeric))  # Convert GDD5 columns to numeric if needed
 
 # Save the new dataframe as a CSV file in the working directory
-write.csv(combined_data, "gdd5_compiled.csv", row.names = FALSE)
+write.csv(combined_data, "gdd5_025_compiled.csv", row.names = FALSE)
 
 
 
+library(dplyr)
+
+# Count NA rows for each 'bms_id' and total number of rows
+na_rows_by_bms_id <- combined_data %>%
+  group_by(bms_id) %>%
+  summarize(total_rows = n(),
+            num_na_rows = sum(is.na(GDD5)))
+
+# Print the result
+print(na_rows_by_bms_id, n = 22)
 
 
 
